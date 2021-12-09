@@ -317,7 +317,9 @@ def edit_contact():
         email_addresses = build_list_of_email_addresses(contacts)
         enumerated_contacts = enumerate_contacts(contacts)
         output_contacts(enumerated_contacts)
-        select_contact = pyip.inputInt("> ", min=1, blank=True)
+        number_of_contacts = len(enumerated_contacts)
+        select_contact = pyip.inputInt("> ", min=1, max=number_of_contacts, 
+                                       blank=True)
         if select_contact == "":
             break
 
@@ -403,3 +405,4 @@ def output_contacts_to_csv():
 
 create_contacts_csv_if_one_does_not_exist()
 prompt_user()
+
