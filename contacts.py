@@ -1,4 +1,4 @@
-"""Command line contact management app."""
+"""Simple command line contact management app"""
 
 import csv
 import os
@@ -8,42 +8,51 @@ import pyinputplus as pyip
 PHONE_NUMBER_REGEX = r"^(\([0-9]{3}\) ?|[0-9]{3}-)[0-9]{3}-[0-9]{4}$"
 
 
+def add_contacts():
+    contacts = import_csv()
+    email_addresses = build_list_of_email_addresses(contacts)
+    phone_numbers = build_list_of_phone_numbers(contacts)
+    contact_details = []
+
+    while True:
+
+        while True:
+            email = pyip.inputEmail("\nemail: ")
+            if email in contact_details or email in email_addresses:
+                print("duplicate")
+            else:
+                contact_details.append(email)
+                break
+
+        contact_details = prompt_user_for_names("first name: ", contact_details)
+        contact_details = prompt_user_for_names("last name: ", contact_details)
+
+        while True:
+            phone_number = input("phone number: ")
+            if not re.match(PHONE_NUMBER_REGEX, phone_number):
+                print("invalid number")
+            elif phone_number in contact_details or \
+            phone_number in phone_numbers:
+                print("duplicate")
+            else:
+                contact_details.append(phone_number)
+                break
+
+        add_another = input("\nadd another? ")
+        if add_another != "yes":
+            break
+
+    contacts_to_add = \
+    convert_list_of_contact_details_to_dictionary(contact_details)
+    output_added_contacts(contacts_to_add)
+    merged_contacts = {**contacts, **contacts_to_add}
+    write_dictionary_to_csv("contacts.csv", merged_contacts)
+
+
 def alert_user():
     print("\n'contacts.csv' is empty")
     print("Let's add some contacts")
-    add_contact()
-
-
-def avoid_duplicate_email_addresses(dct):
-    email_addresses = build_list_of_email_addresses(dct)
-    while True:
-        email_address = pyip.inputEmail("\nemail address: ")
-        if email_address in email_addresses:
-            print("duplicate email address")
-        else:
-            return email_address
-
-
-def avoid_duplicate_phone_numbers(dct):
-    phone_numbers = build_list_of_phone_numbers(dct)
-    while True:
-        phone_number = validate_phone_number()
-        if phone_number in phone_numbers:
-            print("duplicate phone number")
-        else:
-            return phone_number
-
-
-def build_list_of_domain_contacts(dct, lst2):
-    user_choice = pyip.inputInt("> ")
-    selected_domain = dct[user_choice]
-    lst1 = []
-    print(f"\n{selected_domain}")
-    for contact in lst2:
-        if contact.endswith(selected_domain):
-            lst1.append(contact)
-
-    return lst1
+    add_contacts()
 
 
 def build_list_of_domains():
@@ -56,6 +65,18 @@ def build_list_of_domains():
         domains.append(domain)
 
     return dct, list(set(domains))
+
+
+def build_list_of_domain_contacts(dct, lst2):
+    user_choice = pyip.inputInt("> ")
+    selected_domain = dct[user_choice]
+    lst1 = []
+    print(f"\n{selected_domain}")
+    for contact in lst2:
+        if contact.endswith(selected_domain):
+            lst1.append(contact)
+
+    return lst1
 
 
 def build_list_of_email_addresses(dct):
@@ -71,22 +92,96 @@ def build_list_of_phone_numbers(dct):
     return lst
 
 
-def capture_attributes(dct1, dct2):
+def convert_list_of_contact_details_to_dictionary(lst):
+    dct = {}
+    for i in range(0, len(lst), 4):
+        dct[lst[i]] = lst[int(i + 1): int(i + 4)]
+
+    return dct
+
+
+def create_contacts_csv_if_one_does_not_exist():
+    if os.path.exists("contacts.csv"):
+        pass
+    else:
+        open("contacts.csv", "w")
+
+
+def delete_contact():
+    print("\n> delete contact")
+    updated_contacts = {}
     while True:
-        email = avoid_duplicate_email_addresses(dct1)
-        first_name = pyip.inputStr("first name: ")
-        last_name = pyip.inputStr("last name: ")
-        phone_number = avoid_duplicate_phone_numbers(dct1)
-        contact_details = [first_name, last_name, phone_number]
-        dct2[email] = contact_details
-        all_contacts = {**dct1, **dct2}
+        print("\nselect a contact to delete or enter nothing to exit")
+        contacts = import_csv()
+        enumerated_contacts = enumerate_contacts(contacts)
+        for number, attributes in enumerated_contacts.items():
+            email = attributes[0]
+            print(f"{number}. {email}")
+        select_contact = pyip.inputInt("> ", min=1, blank=True)
 
-        write_dictionary_to_csv("contacts.csv", all_contacts)
+        if select_contact == "":
+            break
 
-        add_another = pyip.inputYesNo("\nWould you like to add another "
-                                      "(yes/no)? ")
+        attributes = enumerated_contacts[select_contact]
 
-        if add_another != "yes":
+        print(f"\ndelete {email} (yes or no)?")
+        confirm_delete = pyip.inputYesNo("> ")
+
+        if confirm_delete == "yes":
+            del enumerated_contacts[select_contact]
+            print("\nthe following contact was deleted")
+            for attribute in attributes:
+                print(attribute)
+
+        updated_contacts = populate_dictionary(enumerated_contacts)
+        write_dictionary_to_csv("contacts.csv", updated_contacts)
+
+        print("\nwould you like to delete another (yes or no)?")
+        delete_another = pyip.inputYesNo("> ")
+        if delete_another == "no":
+            break
+
+
+def edit_contact():
+    print("\n> edit contact")
+    contacts = import_csv()
+    if not contacts:
+        alert_user()
+
+    while True:
+        print("\nselect a contact to edit or enter nothing to exit")
+        email_addresses = build_list_of_email_addresses(contacts)
+        enumerated_contacts = enumerate_contacts(contacts)
+        output_contacts(enumerated_contacts)
+        number_of_contacts = len(enumerated_contacts)
+        select_contact = pyip.inputInt("> ", min=1, max=number_of_contacts,
+                                       blank=True)
+        if select_contact == "":
+            break
+
+        selected_contact_attributes = enumerated_contacts[select_contact]
+
+        email = selected_contact_attributes[0]
+        first_name = selected_contact_attributes[1]
+        last_name = selected_contact_attributes[2]
+        phone_number = selected_contact_attributes[3]
+
+        updated_email = edit_email(email, email_addresses)
+        updated_first_name = validate_name("first name:", first_name)
+        updated_last_name = validate_name("last name:", last_name)
+        updated_phone_number = edit_phone_number(contacts, phone_number)
+
+        enumerated_contacts[select_contact] = [updated_email, \
+                                               updated_first_name, \
+                                               updated_last_name, \
+                                               updated_phone_number]
+
+        update_contacts("updated_contacts", enumerated_contacts)
+
+        edit_another = pyip.inputYesNo("\nWould you like to edit another "
+                                       "(yes/no)? ")
+
+        if edit_another != "yes":
             break
 
 
@@ -144,209 +239,18 @@ def import_csv():
     return dct
 
 
-def output_added_contacts(header, dct):
-    print(header)
-    for email_address, contract_attributes in dct.items():
-        print(f"\n{email_address}")
-        for attribute in contract_attributes:
-            print(attribute)
-
-
-def output_contacts(dct):
-    for number, contact_attributes in dct.items():
-        email = contact_attributes[0]
-        first_name = contact_attributes[1]
-        last_name = contact_attributes[2]
-        phone_number = contact_attributes[3]
-        print(f"{number}. {email}, {first_name}, {last_name}, {phone_number}")
-
-
-
-def output_contacts_by_domain(lst):
-    if len(lst) > 1:
-        for number, contact in enumerate(lst, 1):
-            print(f"{number}. {contact}")
-    else:
-        print(*lst)
-
-
-def populate_dictionary(dct2):
-    dct1 = {}
-    for user_attribute in dct2.values():
-        email = user_attribute[0]
-        first_name = user_attribute[1]
-        last_name = user_attribute[2]
-        phone_number = user_attribute[3]
-        dct1[email] = [first_name, last_name, phone_number]
-
-    return dct1
-
-
-def update_contacts(dct1, dct2):
-    dct1 = {}
-    for contact_attributes in dct2.values():
-        email = contact_attributes[0]
-        first_name = contact_attributes[1]
-        last_name = contact_attributes[2]
-        phone_number = contact_attributes[3]
-        dct1[email] = [first_name, last_name, phone_number]
-
-    write_dictionary_to_csv("contacts.csv", dct1)
-
-
-def validate_name(attribute, name):
-    print("current", attribute, name)
-    updated_first_name = pyip.inputStr("> ", blank=True)
-    if updated_first_name == "":
-        updated_first_name = name
-
-    return updated_first_name
-
-
-def validate_phone_number():
-    while True:
-        phone_number = input("phone number (xxx-xxx-xxxx): ")
-        if not re.match(PHONE_NUMBER_REGEX, phone_number):
-            print("invalid number")
-        break
-
-    return phone_number
-
-
-def write_dictionary_to_csv(contacts_csv, dct):
-    with open(contacts_csv, "w") as out_file:
-        out_csv = csv.writer(out_file)
-        out_csv.writerow(["email","first_name","last_name","phone_number"])
-        for email, contact_details in dct.items():
-            keys_values = (email, *contact_details)
-            out_csv.writerow(keys_values)
-
-
-def create_contacts_csv_if_one_does_not_exist():
-    if os.path.exists("contacts.csv"):
-        pass
-    else:
-        open("contacts.csv", "w")
-
-
-def prompt_user():
-    main_menu = {
-        1: ["add contact", add_contact],
-        2: ["delete contact", delete_contact],
-        3: ["edit contact", edit_contact],
-        4: ["list contacts by domain", list_contacts_by_domain],
-        5: ["list all contacts", list_all_contacts],
-        6: ["output contacts to csv", output_contacts_to_csv],
-    }
-
-    numbered_options = list(main_menu.keys())
-
-    while True:
-        print("\nPlease select an option below or nothing to exit\n")
-        for num, option in main_menu.items():
-            print(f"{num}. {option[0]}")
-        user_choice = pyip.inputInt("> ", min=1, blank=True)
-        if user_choice != "":
-            if user_choice not in numbered_options:
-                print("\ninvalid choice")
-            else:
-                main_menu[user_choice][1]()
-        else:
-            print("\nsession complete\n")
-            break
-
-
-def add_contact():
-    print("\n> add contact")
+def list_all_contacts():
+    print("\n> list all contacts\n")
     contacts = import_csv()
-    contacts_to_add = {}
-    capture_attributes(contacts, contacts_to_add)
-
-    if contacts_to_add:
-        if len(contacts_to_add) > 1:
-            output_added_contacts("\nthe following contacts were added",
-                                  contacts_to_add)
+    if contacts:
+        if len(contacts) > 1:
+            for number, (email) in enumerate(sorted(contacts.keys()), 1):
+                print(f"{number}. {email}")
         else:
-            output_added_contacts("\nthe following contact was added",
-                                  contacts_to_add)
-
-
-def delete_contact():
-    print("\n> delete contact")
-    updated_contacts = {}
-    while True:
-        print("\nselect a contact to delete or enter nothing to exit")
-        contacts = import_csv()
-        enumerated_contacts = enumerate_contacts(contacts)
-        for number, attributes in enumerated_contacts.items():
-            email = attributes[0]
-            print(f"{number}. {email}")
-        select_contact = pyip.inputInt("> ", min=1, blank=True)
-
-        if select_contact == "":
-            break
-
-        attributes = enumerated_contacts[select_contact]
-
-        print(f"\ndelete {email} (yes or no)?")
-        confirm_delete = pyip.inputYesNo("> ")
-
-        if confirm_delete == "yes":
-            del enumerated_contacts[select_contact]
-            print("\nthe following contact was deleted")
-            for attribute in attributes:
-                print(attribute)
-
-        updated_contacts = populate_dictionary(enumerated_contacts)
-        write_dictionary_to_csv("contacts.csv", updated_contacts)
-
-        print("\nwould you like to delete another (yes or no)?")
-        delete_another = pyip.inputYesNo("> ")
-        if delete_another == "no":
-            break
-
-
-def edit_contact():
-    print("\n> edit contact")
-    contacts = import_csv()
-    if not contacts:
+            print(*contacts)
+    else:
+        print("no contacts found")
         alert_user()
-
-    while True:
-        print("\nselect a contact to edit or enter nothing to exit")
-        email_addresses = build_list_of_email_addresses(contacts)
-        enumerated_contacts = enumerate_contacts(contacts)
-        output_contacts(enumerated_contacts)
-        number_of_contacts = len(enumerated_contacts)
-        select_contact = pyip.inputInt("> ", min=1, max=number_of_contacts, 
-                                       blank=True)
-        if select_contact == "":
-            break
-
-        selected_contact_attributes = enumerated_contacts[select_contact]
-
-        email = selected_contact_attributes[0]
-        first_name = selected_contact_attributes[1]
-        last_name = selected_contact_attributes[2]
-        phone_number = selected_contact_attributes[3]
-
-        updated_email = edit_email(email, email_addresses)
-        updated_first_name = validate_name("first name:", first_name)
-        updated_last_name = validate_name("last name:", last_name)
-        updated_phone_number = edit_phone_number(contacts, phone_number)
-
-        enumerated_contacts[select_contact] = [updated_email, \
-                                               updated_first_name, \
-                                               updated_last_name, \
-                                               updated_phone_number]
-
-        update_contacts("updated_contacts", enumerated_contacts)
-
-        edit_another = pyip.inputYesNo("\nWould you like to edit another "
-                                       "(yes/no)? ")
-
-        if edit_another != "yes":
-            break
 
 
 def list_contacts_by_domain():
@@ -376,24 +280,30 @@ def list_contacts_by_domain():
 
         output_contacts_by_domain(domain_contacts)
 
-        print("\nwould you like to select another (yes or no?")
+        print("\nwould you like to select another (yes or no?)")
         another_domain = pyip.inputYesNo("> ")
         if another_domain != "yes":
             break
 
 
-def list_all_contacts():
-    print("\n> list all contacts\n")
-    contacts = import_csv()
-    if contacts:
-        if len(contacts) > 1:
-            for number, (email) in enumerate(sorted(contacts.keys()), 1):
-                print(f"{number}. {email}")
-        else:
-            print(*contacts)
+def output_added_contacts(dct):
+    if len(dct.keys()) > 1:
+        print("\nthe following contacts were added")
     else:
-        print("no contacts found")
-        alert_user()
+        print("\nthe following contact was added")
+
+    for k, v in dct.items():
+        print(k)
+        for i in v:
+            print(i)
+
+
+def output_contacts_by_domain(lst):
+    if len(lst) > 1:
+        for number, contact in enumerate(lst, 1):
+            print(f"{number}. {contact}")
+    else:
+        print(*lst)
 
 
 def output_contacts_to_csv():
@@ -403,6 +313,90 @@ def output_contacts_to_csv():
     print('\n"exported_contacts.csv" exported successfully')
 
 
+def output_contacts(dct):
+    for number, contact_attributes in dct.items():
+        email = contact_attributes[0]
+        first_name = contact_attributes[1]
+        last_name = contact_attributes[2]
+        phone_number = contact_attributes[3]
+        print(f"{number}. {email}, {first_name}, {last_name}, {phone_number}")
+
+
+def populate_dictionary(dct2):
+    dct1 = {}
+    for user_attribute in dct2.values():
+        email = user_attribute[0]
+        first_name = user_attribute[1]
+        last_name = user_attribute[2]
+        phone_number = user_attribute[3]
+        dct1[email] = [first_name, last_name, phone_number]
+
+    return dct1
+
+
+def prompt_user():
+    main_menu = {
+        1: ["add contacts", add_contacts],
+        2: ["delete contact", delete_contact],
+        3: ["edit contact", edit_contact],
+        4: ["list contacts by domain", list_contacts_by_domain],
+        5: ["list all contacts", list_all_contacts],
+        6: ["output contacts to csv", output_contacts_to_csv],
+    }
+
+    numbered_options = list(main_menu.keys())
+
+    while True:
+        print("\nPlease select an option below or nothing to exit\n")
+        for num, option in main_menu.items():
+            print(f"{num}. {option[0]}")
+        user_choice = pyip.inputInt("> ", min=1, blank=True)
+        if user_choice != "":
+            if user_choice not in numbered_options:
+                print("\ninvalid choice")
+            else:
+                main_menu[user_choice][1]()
+        else:
+            print("\nsession complete\n")
+            break
+
+
+def prompt_user_for_names(header, lst):
+    name = input(header)
+    lst.append(name)
+
+    return lst
+
+
+def update_contacts(dct1, dct2):
+    dct1 = {}
+    for contact_attributes in dct2.values():
+        email = contact_attributes[0]
+        first_name = contact_attributes[1]
+        last_name = contact_attributes[2]
+        phone_number = contact_attributes[3]
+        dct1[email] = [first_name, last_name, phone_number]
+
+    write_dictionary_to_csv("contacts.csv", dct1)
+
+
+def validate_name(attribute, name):
+    print("current", attribute, name)
+    updated_first_name = pyip.inputStr("> ", blank=True)
+    if updated_first_name == "":
+        updated_first_name = name
+
+    return updated_first_name
+
+
+def write_dictionary_to_csv(contacts_csv, dct):
+    with open(contacts_csv, "w") as out_file:
+        out_csv = csv.writer(out_file)
+        out_csv.writerow(["email","first_name","last_name","phone_number"])
+        for email, contact_details in dct.items():
+            keys_values = (email, *contact_details)
+            out_csv.writerow(keys_values)
+
+
 create_contacts_csv_if_one_does_not_exist()
 prompt_user()
-
