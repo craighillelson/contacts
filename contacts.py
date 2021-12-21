@@ -38,7 +38,7 @@ def add_contacts():
                 contact_details.append(phone_number)
                 break
 
-        add_another = input("\nadd another? ")
+        add_another = input("\nadd another (yes or no)? ")
         if add_another != "yes":
             break
 
